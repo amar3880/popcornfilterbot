@@ -267,3 +267,59 @@ async def successful_premium_payment(client, message):
     except Exception as e:
         print(f"Error Processing Premium Payment: {e}")
         await message.reply("✅ Thank You For Your Payment! (Error Logging Details)")
+        
+@Client.on_message(
+    filters.command("add_premium_all") & filters.user(ADMINS)
+)
+async def add_premium_all(client, message):
+
+    if len(message.command) < 3:
+        return await message.reply_text(
+            "Usage: /add_premium_all 1 day"
+        )
+
+    time = " ".join(message.command[1:])
+    seconds = await get_seconds(time)
+
+    if seconds <= 0:
+        return await message.reply_text(
+            "Invalid time! Example: /add_premium_all 1 day"
+        )
+
+    now = datetime.datetime.now()
+    users = await db.get_all_users()
+
+    count = 0
+
+    async for user_data in users:
+        user_id = user_data.get("id")
+
+        if not user_id:
+            continue
+
+        existing = await db.get_user(user_id)
+        expiry = existing.get("expiry_time") if existing else None
+
+        # Existing premium ko kam nahi karna
+        if isinstance(expiry, datetime.datetime) and expiry > now:
+            base_time = expiry
+        else:
+            base_time = now
+
+        expiry_time = base_time + datetime.timedelta(
+            seconds=seconds
+        )
+
+        await db.update_user({
+            "id": user_id,
+            "expiry_time": expiry_time
+        })
+
+        count += 1
+
+    await message.reply_text(
+        f"🎉 Premium Gift Completed!\n\n"
+        f"👥 Users: {count}\n"
+        f"⏰ Duration: {time}"
+    )
+
